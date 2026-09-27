@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type View = "login" | "signup" | "plans" | "dashboard" | "leads" | "leadDetail" | "buyerGroups" | "recommendations" | "properties" | "propertyDetail";
 
@@ -20,6 +20,14 @@ const leads = [
 ];
 
 type Property = { address: string; id: string; district: string; city: string; price: number; area: number; rooms: number; status: string; sources: number; updated: string; conflict?: boolean };
+type BuyerGroup = { name: string; leads: number; area: string; budget: string; matches: number };
+
+const initialBuyerGroups: BuyerGroup[] = [
+  { name: "ვაკე · 3 ოთახი", leads: 12, area: "80–120 მ²", budget: "90K–160K ₾", matches: 8 },
+  { name: "საბურთალო · ოჯახები", leads: 18, area: "100–160 მ²", budget: "120K–220K ₾", matches: 11 },
+  { name: "საინვესტიციო", leads: 9, area: "40–80 მ²", budget: "60K–110K ₾", matches: 14 },
+  { name: "კერძო სახლები", leads: 7, area: "180+ მ²", budget: "180K–350K ₾", matches: 17 },
+];
 
 const propertySeeds = [
   ["ჭავჭავაძის გამზირი 48", "ვაკე", 118000, 108, 2], ["აბაშიძის ქუჩა 21", "ვაკე", 112500, 96, 3],
@@ -35,22 +43,44 @@ const initialProperties: Property[] = Array.from({ length: 26 }, (_, i) => {
   return { address: seed[0], district: seed[1], city: "თბილისი", price: seed[2] + Math.floor(i / 12) * 3500, area: seed[3], rooms: seed[4], id: `#AG-${10428 - i}`, status: i % 9 === 0 ? "მოძველებული" : "აქტიური", sources: i % 4 === 1 ? 2 : 1, updated: i < 3 ? `${5 + i * 7} წთ` : `${i} სთ`, conflict: i % 7 === 1 };
 });
 
+const english: Record<string,string> = {
+  "მთავარი":"Dashboard","ლიდები":"Leads","მყიდველთა ჯგუფები":"Buyer groups","ობიექტები":"Properties","რეკომენდაციები":"Recommendations","კანონიკური კატალოგი":"Canonical catalog","ახალი ჩანაწერი":"New record","ლიდის დამატება":"Add lead","ობიექტის დამატება":"Add property","ჯგუფის დამატება":"Add buyer group","გაუქმება":"Cancel","დახურვა":"Close","სახელი და გვარი":"Full name","ტელეფონი":"Phone","ელფოსტა":"Email","სასურველი უბანი":"Preferred district","ბიუჯეტი":"Budget","ოთახები":"Rooms","ფართობი":"Area","მისამართი":"Address","ქალაქი":"City","უბანი":"District","ფასი (₾)":"Price (₾)","ფართობი (მ²)":"Area (m²)","სტატუსი":"Status","შენიშვნა":"Note","დამატებითი ინფორმაცია":"Additional information","აქტიური":"Active","მოძველებული":"Stale","შეჩერებული":"Paused","გაყიდული":"Sold","ყველა":"All","დალაგება":"Sort","უახლესი":"Newest","გასუფთავება":"Clear","ფასი მინ.":"Min price","ფასი მაქს.":"Max price","ფასი: ზრდადი":"Price: low to high","ფასი: კლებადი":"Price: high to low","მისამართი ან ID":"Address or ID","რამდენიმე წყარო":"Multiple sources","ფასის სხვაობა":"Price discrepancy","განახლება":"Updated","წყაროები":"Sources","ობიექტის მონაცემები":"Property data","აქტიური წყაროები":"Active sources","წყაროების შედარება":"Compare sources","ორიგინალი ↗":"Original ↗","ლიდებზე დაბრუნება":"Back to leads","ობიექტებზე დაბრუნება":"Back to properties","მოთხოვნა":"Requirements","აქტივობა":"Activity","საუკეთესო შესაბამისობები":"Best matches","ახალი შესაბამისობა":"New matches","გასაგზავნად მზად":"Ready to send","ლიდი":"Lead","ობიექტი":"Property","ნახვა":"View","გაგზავნა":"Send","ახალი ჯგუფი":"New group","რეკომენდაციების ნახვა →":"View recommendations →","მართეთ მოთხოვნები და შემდეგი მოქმედებები":"Manage requirements and next actions","მსგავსი მოთხოვნების გაერთიანებული სეგმენტები":"Segments of similar buyer requirements","ლიდებისა და ობიექტების საუკეთესო შესაბამისობები":"Best matches between leads and properties","ფილტრების გასუფთავება":"Clear filters","ობიექტები ვერ მოიძებნა":"No properties found","შეცვალეთ ან გაასუფთავეთ ფილტრები.":"Change or clear the filters.","ქართული":"English","ინგლისური":"Georgian"
+};
+
+Object.assign(english, {
+  "ჯგუფის სახელი": "Group name", "მინ. ფართობი (მ²)": "Min area (m²)", "მაქს. ფართობი (მ²)": "Max area (m²)",
+  "მინ. ბიუჯეტი (₾)": "Min budget (₾)", "მაქს. ბიუჯეტი (₾)": "Max budget (₾)",
+  "დააფიქსირეთ მოთხოვნა და საკონტაქტო ინფორმაცია.": "Capture the requirements and contact details.",
+  "დაამატეთ ობიექტის ძირითადი კანონიკური მონაცემები.": "Add the property's core canonical data.",
+  "შექმენით მსგავსი მოთხოვნების მქონე მყიდველთა სეგმენტი.": "Create a segment of buyers with similar requirements.",
+  "დილა მშვიდობისა, ელენე": "Good morning, Elene", "ახალი ლიდი": "New lead", "ობიექტის დამატება": "Add property",
+  "ძიება": "Search", "შემდეგი ნაბიჯი": "Next step", "ახალი": "New", "ახლახან": "Just now"
+});
+
+function translatePage(enabled:boolean){document.documentElement.lang=enabled?"en":"ka";document.querySelectorAll("[data-ka]").forEach(el=>{const h=el as HTMLElement;h.textContent=enabled?h.dataset.en||h.dataset.ka||"":h.dataset.ka||""});const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while(n=walker.nextNode()){const raw=n.textContent||"";const trimmed=raw.trim();if(!trimmed)continue;if(enabled){const translated=english[trimmed];if(translated){(n.parentElement as HTMLElement)?.setAttribute("data-ka-text",trimmed);n.textContent=raw.replace(trimmed,translated)}}else{const original=(n.parentElement as HTMLElement)?.getAttribute("data-ka-text");if(original)n.textContent=raw.replace(trimmed,original)}}document.querySelectorAll("input,textarea").forEach(el=>{const input=el as HTMLInputElement;const key=input.dataset.kaPlaceholder||(input.placeholder&&Object.prototype.hasOwnProperty.call(english,input.placeholder)?input.placeholder:"");if(key){input.dataset.kaPlaceholder=key;input.placeholder=enabled?(english[key]||key):key}})}
+
 function Field({ label, placeholder, password = false }: { label: string; placeholder: string; password?: boolean }) {
   return <label className="field"><span>{label}</span><span className="input">{password ? "••••••••" : placeholder}{password && <b>ჩვენება</b>}</span></label>;
 }
 
-function CreateModal({ kind, close, save }: { kind: "lead" | "property"; close: () => void; save: (data: FormData) => void }) {
+function CreateModal({ kind, close, save }: { kind: "lead" | "property" | "group"; close: () => void; save: (data: FormData) => void }) {
   const isLead = kind === "lead";
+  const isGroup = kind === "group";
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); save(new FormData(event.currentTarget)); }
   return <div className="modal-backdrop" role="presentation" onMouseDown={close}>
     <section className="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-title" onMouseDown={e=>e.stopPropagation()}>
-      <header><div><span className="eyebrow">ახალი ჩანაწერი</span><h2 id="create-title">{isLead ? "ლიდის დამატება" : "ობიექტის დამატება"}</h2><p>{isLead ? "დააფიქსირეთ მოთხოვნა და საკონტაქტო ინფორმაცია." : "დაამატეთ ობიექტის ძირითადი კანონიკური მონაცემები."}</p></div><button type="button" className="modal-close" onClick={close} aria-label="დახურვა">×</button></header>
+      <header><div><span className="eyebrow">ახალი ჩანაწერი</span><h2 id="create-title">{isLead ? "ლიდის დამატება" : isGroup ? "ჯგუფის დამატება" : "ობიექტის დამატება"}</h2><p>{isLead ? "დააფიქსირეთ მოთხოვნა და საკონტაქტო ინფორმაცია." : isGroup ? "შექმენით მსგავსი მოთხოვნების მქონე მყიდველთა სეგმენტი." : "დაამატეთ ობიექტის ძირითადი კანონიკური მონაცემები."}</p></div><button type="button" className="modal-close" onClick={close} aria-label="დახურვა">×</button></header>
       <form onSubmit={submit}>
         {isLead ? <>
           <label><span>სახელი და გვარი</span><input name="name" required placeholder="მაგ. ნინო ბერიძე" /></label>
           <div className="form-grid"><label><span>ტელეფონი</span><input name="phone" required placeholder="+995 5XX XX XX XX" /></label><label><span>ელფოსტა</span><input name="email" type="email" placeholder="name@email.com" /></label></div>
           <div className="form-grid"><label><span>სასურველი უბანი</span><select name="district"><option>ვაკე</option><option>საბურთალო</option><option>ვერა</option><option>დიდუბე</option></select></label><label><span>ბიუჯეტი</span><input name="budget" required type="number" placeholder="120000" /></label></div>
           <div className="form-grid"><label><span>ოთახები</span><select name="rooms"><option>2</option><option>3</option><option>4+</option></select></label><label><span>ფართობი</span><input name="area" placeholder="80–110 მ²" /></label></div>
+        </> : isGroup ? <>
+          <label><span>ჯგუფის სახელი</span><input name="name" required placeholder="მაგ. ვაკე · 3 ოთახი" /></label>
+          <div className="form-grid"><label><span>უბანი</span><select name="district"><option>ვაკე</option><option>საბურთალო</option><option>ვერა</option><option>დიდუბე</option></select></label><label><span>ოთახები</span><select name="rooms"><option>2</option><option>3</option><option>4+</option></select></label></div>
+          <div className="form-grid"><label><span>მინ. ფართობი (მ²)</span><input name="minArea" required type="number" placeholder="80" /></label><label><span>მაქს. ფართობი (მ²)</span><input name="maxArea" required type="number" placeholder="120" /></label></div>
+          <div className="form-grid"><label><span>მინ. ბიუჯეტი (₾)</span><input name="minBudget" required type="number" placeholder="90000" /></label><label><span>მაქს. ბიუჯეტი (₾)</span><input name="maxBudget" required type="number" placeholder="160000" /></label></div>
         </> : <>
           <label><span>მისამართი</span><input name="address" required placeholder="მაგ. ჭავჭავაძის გამზირი 48" /></label>
           <div className="form-grid"><label><span>ქალაქი</span><select name="city"><option>თბილისი</option><option>ბათუმი</option><option>ქუთაისი</option></select></label><label><span>უბანი</span><select name="district"><option>ვაკე</option><option>საბურთალო</option><option>ვერა</option><option>დიდუბე</option></select></label></div>
@@ -58,7 +88,7 @@ function CreateModal({ kind, close, save }: { kind: "lead" | "property"; close: 
           <div className="form-grid"><label><span>ოთახები</span><input name="rooms" required type="number" min="1" placeholder="3" /></label><label><span>სტატუსი</span><select name="status"><option>აქტიური</option><option>შეჩერებული</option><option>გაყიდული</option></select></label></div>
         </>}
         <label><span>შენიშვნა</span><textarea name="note" rows={3} placeholder="დამატებითი ინფორმაცია" /></label>
-        <footer><button type="button" className="secondary" onClick={close}>გაუქმება</button><button className="primary" type="submit">{isLead ? "ლიდის დამატება" : "ობიექტის დამატება"}</button></footer>
+        <footer><button type="button" className="secondary" onClick={close}>გაუქმება</button><button className="primary" type="submit">{isLead ? "ლიდის დამატება" : isGroup ? "ჯგუფის დამატება" : "ობიექტის დამატება"}</button></footer>
       </form>
     </section>
   </div>;
@@ -79,9 +109,9 @@ function Plans({ onNavigate }: { onNavigate: (v: View) => void }) {
   ].map(([name,price,desc,items],i)=><article className={`plan ${i===1?"featured":""}`} key={name as string}>{i===1&&<span className="recommended">რეკომენდებული</span>}<h2>{name as string}</h2><p>{desc as string}</p><div className="price"><b>₾{price as string}</b><span>/ თვე</span></div><ul>{(items as string[]).map(x=><li key={x}>✓ {x}</li>)}</ul><button className={i===1?"primary":"secondary"} onClick={()=>onNavigate("dashboard")}>არჩევა</button></article>)}</section><p className="secure">🔒 უსაფრთხო გადახდა · ფასები დღგ-ს ჩათვლით · ინვოისი ელფოსტაზე</p></main>;
 }
 
-function Shell({ view, setView, children }: { view: View; setView: (v: View) => void; children: React.ReactNode }) {
+function Shell({ view, setView, children, englishMode, toggleLanguage }: { view: View; setView: (v: View) => void; children: React.ReactNode; englishMode: boolean; toggleLanguage: () => void }) {
   const active=(id:View)=>view===id||(view==="propertyDetail"&&id==="properties")||(view==="leadDetail"&&id==="leads");
-  return <div className="app-shell"><aside><div className="brand">Agento</div><nav>{nav.map(n=><button key={n.id} className={active(n.id)?"active":""} onClick={()=>setView(n.id)}><span>{n.icon}</span>{n.label}{n.id==="leads"&&<em>24</em>}</button>)}</nav><div className="profile"><span>ერ</span><div><b>ელენე</b><small>Administrator</small></div></div></aside><div className="mobile-top"><button>☰</button><div className="brand">Agento</div><span>ერ</span></div><section className="workspace">{children}</section><nav className="bottom-nav">{nav.filter(n=>n.id!=="buyerGroups").map(n=><button key={n.id} className={active(n.id)?"active":""} onClick={()=>setView(n.id)}><span>{n.icon}</span>{n.label}</button>)}</nav></div>;
+  return <div className="app-shell"><aside><div className="brand">Agento</div><nav>{nav.map(n=><button key={n.id} className={active(n.id)?"active":""} onClick={()=>setView(n.id)}><span>{n.icon}</span>{n.label}{n.id==="leads"&&<em>24</em>}</button>)}</nav><button className="language-toggle" onClick={toggleLanguage} aria-label="Change language">{englishMode ? "KA" : "EN"}</button><div className="profile"><span>ერ</span><div><b>ელენე</b><small>Administrator</small></div></div></aside><div className="mobile-top"><button>☰</button><div className="brand">Agento</div><button className="mobile-language" onClick={toggleLanguage}>{englishMode ? "KA" : "EN"}</button></div><section className="workspace">{children}</section><nav className="bottom-nav">{nav.filter(n=>n.id!=="buyerGroups").map(n=><button key={n.id} className={active(n.id)?"active":""} onClick={()=>setView(n.id)}><span>{n.icon}</span>{n.label}</button>)}</nav></div>;
 }
 
 function Dashboard({ addLead }: { addLead: () => void }) { return <><header className="page-head"><div><h1>დილა მშვიდობისა, ელენე</h1><p>7 მოქმედება გელოდებათ დღეს</p></div><button className="primary" onClick={addLead}>+ ახალი ლიდი</button></header><div className="metric-grid">{[["აქტიური ლიდები","24","+4 ამ კვირაში"],["ახალი დამთხვევები","18","6 მაღალი შესაბამისობა"],["დღეს გასაკეთებელი","7","3 ზარი · 2 შეხვედრა"],["აქტიური ობიექტები","326","12 განახლდა"]].map(x=><article className="metric" key={x[0]}><span>{x[0]}</span><b>{x[1]}</b><small>{x[2]}</small></article>)}</div><div className="dashboard-grid"><article className="panel"><h2>დღის პრიორიტეტები</h2>{["14:30 · ნინო ბერიძესთან დარეკვა","16:00 · ობიექტის ნახვა","მარიამის მოთხოვნის დაზუსტება","ანა კაპანაძის მონაცემების განახლება"].map((x,i)=><div className="task" key={x}><button>○</button><div><b>{x}</b><small>{i===0?"ახალი 91% დამთხვევა":"შეხსენება"}</small></div></div>)}</article><aside className="signals"><article><b>ობიექტების წყაროები</b><span>MyHome აქტიურია · 5 წთ წინ</span></article><article><b>გაერთიანებული ჩანაწერები</b><span>28 ობიექტი რამდენიმე წყაროდან</span></article><article className="warning"><b>ყურადღება</b><span>3 ობიექტს აქვს ფასის სხვაობა</span></article></aside></div></>; }
@@ -120,7 +150,7 @@ function PropertiesPage({ open, addProperty, items }: { open: () => void; addPro
   </>;
 }
 
-function BuyerGroups({ openRecommendations }: { openRecommendations: () => void }) { const groups=[["ვაკე · 3 ოთახი","12 ლიდი","80–120 მ²","90K–160K ₾"],["საბურთალო · ოჯახები","18 ლიდი","100–160 მ²","120K–220K ₾"],["საინვესტიციო","9 ლიდი","40–80 მ²","60K–110K ₾"],["კერძო სახლები","7 ლიდი","180+ მ²","180K–350K ₾"]]; return <><header className="page-head"><div><h1>მყიდველთა ჯგუფები</h1><p>მსგავსი მოთხოვნების გაერთიანებული სეგმენტები</p></div><button className="primary">+ ახალი ჯგუფი</button></header><section className="group-grid">{groups.map((g,i)=><article className="group-card" key={g[0]}><div className="group-icon">{i+1}</div><span className="status">აქტიური</span><h2>{g[0]}</h2><p>{g[2]} · {g[3]}</p><div><b>{g[1]}</b><span>{8+i*3} ახალი შესაბამისობა</span></div><button onClick={openRecommendations}>რეკომენდაციების ნახვა →</button></article>)}</section></> }
+function BuyerGroups({ items, addGroup, openRecommendations }: { items: BuyerGroup[]; addGroup: () => void; openRecommendations: () => void }) { return <><header className="page-head"><div><h1>მყიდველთა ჯგუფები</h1><p>მსგავსი მოთხოვნების გაერთიანებული სეგმენტები</p></div><button className="primary" onClick={addGroup}>+ ახალი ჯგუფი</button></header><section className="group-grid">{items.map((g,i)=><article className="group-card" key={`${g.name}-${i}`}><div className="group-icon">{i+1}</div><span className="status">აქტიური</span><h2>{g.name}</h2><p>{g.area} · {g.budget}</p><div><b>{g.leads} ლიდი</b><span>{g.matches} ახალი შესაბამისობა</span></div><button onClick={openRecommendations}>რეკომენდაციების ნახვა →</button></article>)}</section></> }
 
 function Recommendations({ openProperty }: { openProperty: () => void }) { const matches=[["ნინო ბერიძე","ჭავჭავაძის გამზირი 48","94%","118,000 ₾"],["მარიამ გელაშვილი","ფალიაშვილის ქუჩა 9","91%","124,000 ₾"],["გიორგი მაისურაძე","ყაზბეგის გამზირი 12","88%","98,000 ₾"],["ანა კაპანაძე","წყნეთის გზატკეცილი 9","86%","240,000 ₾"]];return <><header className="page-head"><div><h1>რეკომენდაციები</h1><p>ლიდებისა და ობიექტების საუკეთესო შესაბამისობები</p></div><button className="secondary">↻ განახლება</button></header><div className="recommendation-summary"><article><b>18</b><span>ახალი შესაბამისობა</span></article><article><b>6</b><span>90%+ შესაბამისობა</span></article><article><b>4</b><span>გასაგზავნად მზად</span></article></div><section className="match-list">{matches.map((m,i)=><article key={m[0]}><div className="match-score">{m[2]}</div><div><span>ლიდი</span><b>{m[0]}</b><small>{i%2?"3 ოთახი · ვაკე":"2–3 ოთახი · თბილისი"}</small></div><div className="match-arrow">→</div><div><span>ობიექტი</span><b>{m[1]}</b><small>{m[3]} · განახლებულია დღეს</small></div><div className="match-actions"><button className="secondary" onClick={openProperty}>ნახვა</button><button className="primary">გაგზავნა</button></div></article>)}</section></> }
 
@@ -130,10 +160,11 @@ function PropertyDetail({ back }: { back: () => void }) { return <><button class
 
 export default function Home() {
   const [view,setView]=useState<View>("properties");
-  const [modal,setModal]=useState<"lead"|"property"|null>(null); const [leadItems,setLeadItems]=useState(leads); const [propertyItems,setPropertyItems]=useState(initialProperties); const [toast,setToast]=useState("");
-  function save(data:FormData){if(modal==="lead"){setLeadItems(x=>[[String(data.get("name")),`${data.get("rooms")} ოთახი · ${data.get("area")||"ფართობი არ არის მითითებული"}`,`${Number(data.get("budget")).toLocaleString("en-US")} ₾`,String(data.get("district")),"ახალი","ახლახან"],...x]);setView("leads");setToast("ლიდი წარმატებით დაემატა")}else if(modal==="property"){setPropertyItems(x=>[{address:String(data.get("address")),id:`#AG-${10500+x.length}`,district:String(data.get("district")),city:String(data.get("city")),price:Number(data.get("price")),area:Number(data.get("area")),rooms:Number(data.get("rooms")),status:String(data.get("status")),sources:1,updated:"ახლახან"},...x]);setView("properties");setToast("ობიექტი წარმატებით დაემატა")}setModal(null);setTimeout(()=>setToast(""),2600)}
+  const [modal,setModal]=useState<"lead"|"property"|"group"|null>(null); const [leadItems,setLeadItems]=useState(leads); const [propertyItems,setPropertyItems]=useState(initialProperties); const [groupItems,setGroupItems]=useState(initialBuyerGroups); const [toast,setToast]=useState(""); const [englishMode,setEnglishMode]=useState(false);
+  useEffect(()=>{translatePage(englishMode)},[englishMode,view,modal,leadItems,propertyItems,groupItems]);
+  function save(data:FormData){if(modal==="lead"){setLeadItems(x=>[[String(data.get("name")),`${data.get("rooms")} ოთახი · ${data.get("area")||"ფართობი არ არის მითითებული"}`,`${Number(data.get("budget")).toLocaleString("en-US")} ₾`,String(data.get("district")),"ახალი","ახლახან"],...x]);setView("leads");setToast("ლიდი წარმატებით დაემატა")}else if(modal==="property"){setPropertyItems(x=>[{address:String(data.get("address")),id:`#AG-${10500+x.length}`,district:String(data.get("district")),city:String(data.get("city")),price:Number(data.get("price")),area:Number(data.get("area")),rooms:Number(data.get("rooms")),status:String(data.get("status")),sources:1,updated:"ახლახან"},...x]);setView("properties");setToast("ობიექტი წარმატებით დაემატა")}else if(modal==="group"){setGroupItems(x=>[{name:String(data.get("name")),leads:0,area:`${data.get("minArea")}–${data.get("maxArea")} მ²`,budget:`${Number(data.get("minBudget"))/1000}K–${Number(data.get("maxBudget"))/1000}K ₾`,matches:0},...x]);setView("buyerGroups");setToast("ჯგუფი წარმატებით დაემატა")}setModal(null);setTimeout(()=>setToast(""),2600)}
   if(view==="login") return <Auth onNavigate={setView}/>;
   if(view==="signup") return <Auth signup onNavigate={setView}/>;
   if(view==="plans") return <Plans onNavigate={setView}/>;
-  return <>{<Shell view={view} setView={setView}>{view==="dashboard"?<Dashboard addLead={()=>setModal("lead")}/>:view==="leads"?<LeadsPage items={leadItems} addLead={()=>setModal("lead")} open={()=>setView("leadDetail")}/>:view==="leadDetail"?<LeadDetail back={()=>setView("leads")} openProperty={()=>setView("propertyDetail")}/>:view==="buyerGroups"?<BuyerGroups openRecommendations={()=>setView("recommendations")}/>:view==="recommendations"?<Recommendations openProperty={()=>setView("propertyDetail")}/>:view==="propertyDetail"?<PropertyDetail back={()=>setView("properties")}/>:<PropertiesPage items={propertyItems} addProperty={()=>setModal("property")} open={()=>setView("propertyDetail")}/>}</Shell>}{modal&&<CreateModal kind={modal} close={()=>setModal(null)} save={save}/>} {toast&&<div className="toast" role="status">✓ {toast}</div>}</>;
+  return <>{<Shell view={view} setView={setView} englishMode={englishMode} toggleLanguage={()=>setEnglishMode(x=>!x)}>{view==="dashboard"?<Dashboard addLead={()=>setModal("lead")}/>:view==="leads"?<LeadsPage items={leadItems} addLead={()=>setModal("lead")} open={()=>setView("leadDetail")}/>:view==="leadDetail"?<LeadDetail back={()=>setView("leads")} openProperty={()=>setView("propertyDetail")}/>:view==="buyerGroups"?<BuyerGroups items={groupItems} addGroup={()=>setModal("group")} openRecommendations={()=>setView("recommendations")}/>:view==="recommendations"?<Recommendations openProperty={()=>setView("propertyDetail")}/>:view==="propertyDetail"?<PropertyDetail back={()=>setView("properties")}/>:<PropertiesPage items={propertyItems} addProperty={()=>setModal("property")} open={()=>setView("propertyDetail")}/>}</Shell>}{modal&&<CreateModal kind={modal} close={()=>setModal(null)} save={save}/>} {toast&&<div className="toast" role="status">✓ {toast}</div>}</>;
 }

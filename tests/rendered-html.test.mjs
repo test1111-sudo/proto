@@ -43,4 +43,8 @@ test("includes working creation, filtering and pagination controls", async () =>
   assert.match(page, /setMinPrice/);
   assert.match(page, /setDistrict/);
   assert.match(page, /setStatus/);
+  assert.match(page, /"lead"\|"property"\|"group"/);
+  assert.match(page, /function translatePage/);
+  assert.match(page, /setGroupItems/);
+  assert.match(page, /language-toggle/);
 });
