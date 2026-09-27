@@ -17,11 +17,12 @@ test("renders the Agento properties prototype", async () => {
   const html = await response.text();
   assert.match(html, /<title>Agento — Responsive Product Prototype<\/title>/i);
   assert.match(html, /ობიექტები/);
-  assert.match(html, /326 გაერთიანებული ჩანაწერი/);
-  assert.match(html, /მისამართი \/ მდებარეობა/);
+  assert.match(html, /26(?:<!-- -->)? გაერთიანებული ჩანაწერი/);
+  assert.match(html, /მისამართი ან ID/);
   assert.match(html, /ფასის სხვაობა/);
   assert.match(html, /ერთი ობიექტი ნაჩვენებია ერთხელ/);
   assert.doesNotMatch(html, /Lead Detector|ანალიტიკა/);
+  assert.match(html, /1–10(?:<!-- -->)? \/ (?:<!-- -->)?26/);
 });
 
 test("ships the three responsive property layouts", async () => {
@@ -31,4 +32,15 @@ test("ships the three responsive property layouts", async () => {
   assert.match(css, /@media\(max-width:767px\)/);
   assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css, /property-table\{grid-template-columns:1fr\}/);
+});
+
+test("includes working creation, filtering and pagination controls", async () => {
+  const page = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("../app/page.tsx", import.meta.url), "utf8"));
+  assert.match(page, /function CreateModal/);
+  assert.match(page, /ლიდის დამატება/);
+  assert.match(page, /ობიექტის დამატება/);
+  assert.match(page, /filtered\.slice\(\(current-1\)\*10,current\*10\)/);
+  assert.match(page, /setMinPrice/);
+  assert.match(page, /setDistrict/);
+  assert.match(page, /setStatus/);
 });

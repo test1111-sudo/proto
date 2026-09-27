@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 
 type View = "login" | "signup" | "plans" | "dashboard" | "leads" | "properties" | "propertyDetail";
 
@@ -17,15 +17,49 @@ const leads = [
   ["მარიამ გელაშვილი", "3 საძინებელი · 100–140 მ²", "185,000 ₾", "ლისი", "ახალი", "91% match"],
 ];
 
-const properties = [
-  ["ჭავჭავაძის გამზირი 48", "#AG-10428 · ვაკე", "118,000 ₾", "108 მ²", "აქტიური", "5 წთ"],
-  ["აბაშიძის ქუჩა 21", "#AG-10412 · ვაკე", "112,500 ₾", "96 მ²", "კონფლიქტი", "18 წთ"],
-  ["ფალიაშვილის ქუჩა 9", "#AG-10397 · ვაკე", "124,000 ₾", "84 მ²", "აქტიური", "1 სთ"],
-  ["წერეთლის გამზირი 72", "#AG-10281 · დიდუბე", "76,000 ₾", "61 მ²", "მოძველებული", "3 დღე"],
-];
+type Property = { address: string; id: string; district: string; city: string; price: number; area: number; rooms: number; status: string; sources: number; updated: string; conflict?: boolean };
+
+const propertySeeds = [
+  ["ჭავჭავაძის გამზირი 48", "ვაკე", 118000, 108, 2], ["აბაშიძის ქუჩა 21", "ვაკე", 112500, 96, 3],
+  ["ფალიაშვილის ქუჩა 9", "ვაკე", 124000, 84, 2], ["წერეთლის გამზირი 72", "დიდუბე", 76000, 61, 3],
+  ["ვაჟა-ფშაველას გამზირი 23", "საბურთალო", 142000, 116, 4], ["ყაზბეგის გამზირი 12", "საბურთალო", 98000, 78, 2],
+  ["კოსტავას ქუჩა 68", "ვერა", 156000, 104, 3], ["მარჯანიშვილის ქუჩა 16", "ჩუღურეთი", 89000, 70, 2],
+  ["წყნეთის გზატკეცილი 9", "ბაგები", 240000, 164, 5], ["ტაბიძის ქუჩა 4", "სოლოლაკი", 176000, 112, 3],
+  ["გორგასლის ქუჩა 38", "ორთაჭალა", 101000, 86, 3], ["მოსაშვილის ქუჩა 7", "ვაკე", 132000, 91, 3],
+] as const;
+
+const initialProperties: Property[] = Array.from({ length: 26 }, (_, i) => {
+  const seed = propertySeeds[i % propertySeeds.length];
+  return { address: seed[0], district: seed[1], city: "თბილისი", price: seed[2] + Math.floor(i / 12) * 3500, area: seed[3], rooms: seed[4], id: `#AG-${10428 - i}`, status: i % 9 === 0 ? "მოძველებული" : "აქტიური", sources: i % 4 === 1 ? 2 : 1, updated: i < 3 ? `${5 + i * 7} წთ` : `${i} სთ`, conflict: i % 7 === 1 };
+});
 
 function Field({ label, placeholder, password = false }: { label: string; placeholder: string; password?: boolean }) {
   return <label className="field"><span>{label}</span><span className="input">{password ? "••••••••" : placeholder}{password && <b>ჩვენება</b>}</span></label>;
+}
+
+function CreateModal({ kind, close, save }: { kind: "lead" | "property"; close: () => void; save: (data: FormData) => void }) {
+  const isLead = kind === "lead";
+  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); save(new FormData(event.currentTarget)); }
+  return <div className="modal-backdrop" role="presentation" onMouseDown={close}>
+    <section className="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-title" onMouseDown={e=>e.stopPropagation()}>
+      <header><div><span className="eyebrow">ახალი ჩანაწერი</span><h2 id="create-title">{isLead ? "ლიდის დამატება" : "ობიექტის დამატება"}</h2><p>{isLead ? "დააფიქსირეთ მოთხოვნა და საკონტაქტო ინფორმაცია." : "დაამატეთ ობიექტის ძირითადი კანონიკური მონაცემები."}</p></div><button type="button" className="modal-close" onClick={close} aria-label="დახურვა">×</button></header>
+      <form onSubmit={submit}>
+        {isLead ? <>
+          <label><span>სახელი და გვარი</span><input name="name" required placeholder="მაგ. ნინო ბერიძე" /></label>
+          <div className="form-grid"><label><span>ტელეფონი</span><input name="phone" required placeholder="+995 5XX XX XX XX" /></label><label><span>ელფოსტა</span><input name="email" type="email" placeholder="name@email.com" /></label></div>
+          <div className="form-grid"><label><span>სასურველი უბანი</span><select name="district"><option>ვაკე</option><option>საბურთალო</option><option>ვერა</option><option>დიდუბე</option></select></label><label><span>ბიუჯეტი</span><input name="budget" required type="number" placeholder="120000" /></label></div>
+          <div className="form-grid"><label><span>ოთახები</span><select name="rooms"><option>2</option><option>3</option><option>4+</option></select></label><label><span>ფართობი</span><input name="area" placeholder="80–110 მ²" /></label></div>
+        </> : <>
+          <label><span>მისამართი</span><input name="address" required placeholder="მაგ. ჭავჭავაძის გამზირი 48" /></label>
+          <div className="form-grid"><label><span>ქალაქი</span><select name="city"><option>თბილისი</option><option>ბათუმი</option><option>ქუთაისი</option></select></label><label><span>უბანი</span><select name="district"><option>ვაკე</option><option>საბურთალო</option><option>ვერა</option><option>დიდუბე</option></select></label></div>
+          <div className="form-grid"><label><span>ფასი (₾)</span><input name="price" required type="number" placeholder="118000" /></label><label><span>ფართობი (მ²)</span><input name="area" required type="number" placeholder="108" /></label></div>
+          <div className="form-grid"><label><span>ოთახები</span><input name="rooms" required type="number" min="1" placeholder="3" /></label><label><span>სტატუსი</span><select name="status"><option>აქტიური</option><option>შეჩერებული</option><option>გაყიდული</option></select></label></div>
+        </>}
+        <label><span>შენიშვნა</span><textarea name="note" rows={3} placeholder="დამატებითი ინფორმაცია" /></label>
+        <footer><button type="button" className="secondary" onClick={close}>გაუქმება</button><button className="primary" type="submit">{isLead ? "ლიდის დამატება" : "ობიექტის დამატება"}</button></footer>
+      </form>
+    </section>
+  </div>;
 }
 
 function Auth({ signup, onNavigate }: { signup?: boolean; onNavigate: (v: View) => void }) {
@@ -47,28 +81,39 @@ function Shell({ view, setView, children }: { view: View; setView: (v: View) => 
   return <div className="app-shell"><aside><div className="brand">Agento</div><nav>{nav.map(n=><button key={n.id} className={view===n.id||view==="propertyDetail"&&n.id==="properties"?"active":""} onClick={()=>setView(n.id)}><span>{n.icon}</span>{n.label}{n.id==="leads"&&<em>24</em>}</button>)}<button><span>◫</span>რეკომენდაციები</button></nav><div className="profile"><span>ერ</span><div><b>ელენე</b><small>Administrator</small></div></div></aside><div className="mobile-top"><button>☰</button><div className="brand">Agento</div><span>ერ</span></div><section className="workspace">{children}</section><nav className="bottom-nav">{nav.map(n=><button key={n.id} className={view===n.id||view==="propertyDetail"&&n.id==="properties"?"active":""} onClick={()=>setView(n.id)}><span>{n.icon}</span>{n.label}</button>)}</nav></div>;
 }
 
-function Dashboard() { return <><header className="page-head"><div><h1>დილა მშვიდობისა, ელენე</h1><p>7 მოქმედება გელოდებათ დღეს</p></div><button className="primary">+ ახალი ლიდი</button></header><div className="metric-grid">{[["აქტიური ლიდები","24","+4 ამ კვირაში"],["ახალი დამთხვევები","18","6 მაღალი შესაბამისობა"],["დღეს გასაკეთებელი","7","3 ზარი · 2 შეხვედრა"],["აქტიური ობიექტები","326","12 განახლდა"]].map(x=><article className="metric" key={x[0]}><span>{x[0]}</span><b>{x[1]}</b><small>{x[2]}</small></article>)}</div><div className="dashboard-grid"><article className="panel"><h2>დღის პრიორიტეტები</h2>{["14:30 · ნინო ბერიძესთან დარეკვა","16:00 · ობიექტის ნახვა","მარიამის მოთხოვნის დაზუსტება","ანა კაპანაძის მონაცემების განახლება"].map((x,i)=><div className="task" key={x}><button>○</button><div><b>{x}</b><small>{i===0?"ახალი 91% დამთხვევა":"შეხსენება"}</small></div></div>)}</article><aside className="signals"><article><b>ობიექტების წყაროები</b><span>MyHome აქტიურია · 5 წთ წინ</span></article><article><b>გაერთიანებული ჩანაწერები</b><span>28 ობიექტი რამდენიმე წყაროდან</span></article><article className="warning"><b>ყურადღება</b><span>3 ობიექტს აქვს ფასის სხვაობა</span></article></aside></div></>; }
+function Dashboard({ addLead }: { addLead: () => void }) { return <><header className="page-head"><div><h1>დილა მშვიდობისა, ელენე</h1><p>7 მოქმედება გელოდებათ დღეს</p></div><button className="primary" onClick={addLead}>+ ახალი ლიდი</button></header><div className="metric-grid">{[["აქტიური ლიდები","24","+4 ამ კვირაში"],["ახალი დამთხვევები","18","6 მაღალი შესაბამისობა"],["დღეს გასაკეთებელი","7","3 ზარი · 2 შეხვედრა"],["აქტიური ობიექტები","326","12 განახლდა"]].map(x=><article className="metric" key={x[0]}><span>{x[0]}</span><b>{x[1]}</b><small>{x[2]}</small></article>)}</div><div className="dashboard-grid"><article className="panel"><h2>დღის პრიორიტეტები</h2>{["14:30 · ნინო ბერიძესთან დარეკვა","16:00 · ობიექტის ნახვა","მარიამის მოთხოვნის დაზუსტება","ანა კაპანაძის მონაცემების განახლება"].map((x,i)=><div className="task" key={x}><button>○</button><div><b>{x}</b><small>{i===0?"ახალი 91% დამთხვევა":"შეხსენება"}</small></div></div>)}</article><aside className="signals"><article><b>ობიექტების წყაროები</b><span>MyHome აქტიურია · 5 წთ წინ</span></article><article><b>გაერთიანებული ჩანაწერები</b><span>28 ობიექტი რამდენიმე წყაროდან</span></article><article className="warning"><b>ყურადღება</b><span>3 ობიექტს აქვს ფასის სხვაობა</span></article></aside></div></>; }
 
-function LeadsPage() { return <><header className="page-head"><div><h1>ლიდები</h1><p>მართეთ მოთხოვნები და შემდეგი მოქმედებები</p></div><button className="primary">+ ახალი ლიდი</button></header><div className="filters"><button>⌕ ძიება</button><button>სტატუსი⌄</button><button>უბანი⌄</button><button>ბიუჯეტი⌄</button><button>↕ განახლება</button></div><section className="data-list">{leads.map((r,i)=><article className="data-row" key={r[0]}><div><b>{r[0]}</b><small>{r[1]}</small></div><div><b>{r[2]}</b><small>{r[3]}</small></div><span className={`status s${i}`}>{r[4]}</span><div className="next"><small>შემდეგი ნაბიჯი</small><b>{r[5]}</b></div><button className="more">•••</button></article>)}</section></>; }
+function LeadsPage({ addLead, items }: { addLead: () => void; items: string[][] }) { return <><header className="page-head"><div><h1>ლიდები</h1><p>მართეთ მოთხოვნები და შემდეგი მოქმედებები</p></div><button className="primary" onClick={addLead}>+ ახალი ლიდი</button></header><div className="filters"><button>⌕ ძიება</button><button>სტატუსი⌄</button><button>უბანი⌄</button><button>ბიუჯეტი⌄</button><button>↕ განახლება</button></div><section className="data-list">{items.map((r,i)=><article className="data-row" key={`${r[0]}-${i}`}><div><b>{r[0]}</b><small>{r[1]}</small></div><div><b>{r[2]}</b><small>{r[3]}</small></div><span className={`status s${i%3}`}>{r[4]}</span><div className="next"><small>შემდეგი ნაბიჯი</small><b>{r[5]}</b></div><button className="more">•••</button></article>)}</section></>; }
 
-function PropertiesPage({ open }: { open: () => void }) {
+function PropertiesPage({ open, addProperty, items }: { open: () => void; addProperty: () => void; items: Property[] }) {
+  const [query,setQuery]=useState(""); const [district,setDistrict]=useState("ყველა"); const [status,setStatus]=useState("ყველა"); const [rooms,setRooms]=useState("ყველა"); const [minPrice,setMinPrice]=useState(""); const [maxPrice,setMaxPrice]=useState(""); const [sort,setSort]=useState("newest"); const [page,setPage]=useState(1);
+  const filtered=useMemo(()=>items.filter(x=>(!query||`${x.address} ${x.id}`.toLowerCase().includes(query.toLowerCase()))&&(district==="ყველა"||x.district===district)&&(status==="ყველა"||x.status===status)&&(rooms==="ყველა"||x.rooms===Number(rooms))&&(!minPrice||x.price>=Number(minPrice))&&(!maxPrice||x.price<=Number(maxPrice))).sort((a,b)=>sort==="priceAsc"?a.price-b.price:sort==="priceDesc"?b.price-a.price:sort==="area"?b.area-a.area:Number(b.id.slice(4))-Number(a.id.slice(4))),[items,query,district,status,rooms,minPrice,maxPrice,sort]);
+  const pageCount=Math.max(1,Math.ceil(filtered.length/10)); const current=Math.min(page,pageCount); const visible=filtered.slice((current-1)*10,current*10); const reset=()=>{setQuery("");setDistrict("ყველა");setStatus("ყველა");setRooms("ყველა");setMinPrice("");setMaxPrice("");setSort("newest");setPage(1)};
   return <>
-    <header className="page-head properties-head"><div><h1>ობიექტები</h1><p>326 გაერთიანებული ჩანაწერი · განახლდა 5 წუთის წინ</p></div><button className="primary">+ ობიექტის დამატება</button></header>
+    <header className="page-head properties-head"><div><h1>ობიექტები</h1><p>{items.length} გაერთიანებული ჩანაწერი · განახლდა 5 წუთის წინ</p></div><button className="primary" onClick={addProperty}>+ ობიექტის დამატება</button></header>
     <section className="property-metrics">
       {[['აქტიური','298','good'],['რამდენიმე წყარო','47','purple'],['ფასის სხვაობა','12','warn'],['მოძველებული','9','bad']].map(x=><article key={x[0]}><span>{x[0]}</span><b className={x[2]}>{x[1]}</b></article>)}
     </section>
-    <div className="filters property-filters"><button>⌕ მისამართი / მდებარეობა</button><button>ფასი⌄</button><button>₾/მ²⌄</button><button>ფართობი⌄</button><button>ოთახები⌄</button><button>უბანი⌄</button><button>ქალაქი⌄</button><button>ურბანი⌄</button><button>სტატუსი⌄</button><button>↕ უახლესი</button></div>
+    <div className="property-filter-panel">
+      <label className="filter-search"><span>⌕</span><input aria-label="მისამართით ან ID-ით ძიება" value={query} onChange={e=>{setQuery(e.target.value);setPage(1)}} placeholder="მისამართი ან ID" /></label>
+      <label><span>ფასი მინ.</span><input type="number" value={minPrice} onChange={e=>{setMinPrice(e.target.value);setPage(1)}} placeholder="0 ₾" /></label><label><span>ფასი მაქს.</span><input type="number" value={maxPrice} onChange={e=>{setMaxPrice(e.target.value);setPage(1)}} placeholder="ნებისმიერი" /></label>
+      <label><span>ოთახები</span><select value={rooms} onChange={e=>{setRooms(e.target.value);setPage(1)}}><option>ყველა</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+      <label><span>უბანი</span><select value={district} onChange={e=>{setDistrict(e.target.value);setPage(1)}}><option>ყველა</option>{[...new Set(items.map(x=>x.district))].map(x=><option key={x}>{x}</option>)}</select></label>
+      <label><span>სტატუსი</span><select value={status} onChange={e=>{setStatus(e.target.value);setPage(1)}}><option>ყველა</option><option>აქტიური</option><option>მოძველებული</option><option>შეჩერებული</option><option>გაყიდული</option></select></label>
+      <label><span>დალაგება</span><select value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">უახლესი</option><option value="priceAsc">ფასი: ზრდადი</option><option value="priceDesc">ფასი: კლებადი</option><option value="area">ფართობი</option></select></label><button className="clear-filters" onClick={reset}>გასუფთავება</button>
+    </div>
     <div className="dataset-note">ერთი ობიექტი ნაჩვენებია ერთხელ — აქტიური წყაროები გაერთიანებულია კანონიკურ ჩანაწერში.</div>
     <section className="property-table" aria-label="ობიექტების სია">
       <div className="property-table-head"><span>მისამართი / რაიონი</span><span>ფასი</span><span>ფართობი</span><span>ოთახები</span><span>₾/მ²</span><span>წყაროები</span><span>განახლება</span></div>
-      {properties.map((r,i)=><button className="property-row" key={r[0]} onClick={open}>
-        <span className="property-address"><b>{r[0]}</b><small>{r[1]}</small>{i===1&&<em>ფასის სხვაობა</em>}</span>
-        <strong>{r[2]}</strong><span>{r[3]}</span><span>{i%2?"3":"2"}</span><span>{i===0?"1,093":"1,172"} ₾</span>
-        <span className="row-sources"><i>M</i>{i===1&&<i className="alt">S2</i>}<small>{i===1?"2 წყარო":"1 წყარო"}</small></span>
-        <time>{r[5]} წინ</time>
+      {visible.map((r,i)=><button className="property-row" key={r.id} onClick={open}>
+        <span className="property-address"><b>{r.address}</b><small>{r.id} · {r.district}</small>{r.conflict&&<em>ფასის სხვაობა</em>}</span>
+        <strong>{r.price.toLocaleString("en-US")} ₾</strong><span>{r.area} მ²</span><span>{r.rooms}</span><span>{Math.round(r.price/r.area).toLocaleString("en-US")} ₾</span>
+        <span className="row-sources"><i>M</i>{r.sources>1&&<i className="alt">S2</i>}<small>{r.sources} წყარო</small></span>
+        <time>{r.updated} წინ</time>
       </button>)}
+      {!visible.length&&<div className="empty-results"><b>ობიექტები ვერ მოიძებნა</b><span>შეცვალეთ ან გაასუფთავეთ ფილტრები.</span><button onClick={reset}>ფილტრების გასუფთავება</button></div>}
     </section>
-    <div className="pagination"><span>1–25 / 326</span><button>‹</button><b>1</b><button>2</button><button>3</button><span>…</span><button>14</button><button>›</button></div>
+    <div className="pagination"><span>{filtered.length?`${(current-1)*10+1}–${Math.min(current*10,filtered.length)}`:"0"} / {filtered.length}</span><button disabled={current===1} onClick={()=>setPage(current-1)}>‹</button>{Array.from({length:pageCount},(_,i)=>i+1).map(n=><button key={n} className={n===current?"current":""} onClick={()=>setPage(n)}>{n}</button>)}<button disabled={current===pageCount} onClick={()=>setPage(current+1)}>›</button></div>
   </>;
 }
 
@@ -76,8 +121,10 @@ function PropertyDetail({ back }: { back: () => void }) { return <><button class
 
 export default function Home() {
   const [view,setView]=useState<View>("properties");
+  const [modal,setModal]=useState<"lead"|"property"|null>(null); const [leadItems,setLeadItems]=useState(leads); const [propertyItems,setPropertyItems]=useState(initialProperties); const [toast,setToast]=useState("");
+  function save(data:FormData){if(modal==="lead"){setLeadItems(x=>[[String(data.get("name")),`${data.get("rooms")} ოთახი · ${data.get("area")||"ფართობი არ არის მითითებული"}`,`${Number(data.get("budget")).toLocaleString("en-US")} ₾`,String(data.get("district")),"ახალი","ახლახან"],...x]);setView("leads");setToast("ლიდი წარმატებით დაემატა")}else if(modal==="property"){setPropertyItems(x=>[{address:String(data.get("address")),id:`#AG-${10500+x.length}`,district:String(data.get("district")),city:String(data.get("city")),price:Number(data.get("price")),area:Number(data.get("area")),rooms:Number(data.get("rooms")),status:String(data.get("status")),sources:1,updated:"ახლახან"},...x]);setView("properties");setToast("ობიექტი წარმატებით დაემატა")}setModal(null);setTimeout(()=>setToast(""),2600)}
   if(view==="login") return <Auth onNavigate={setView}/>;
   if(view==="signup") return <Auth signup onNavigate={setView}/>;
   if(view==="plans") return <Plans onNavigate={setView}/>;
-  return <Shell view={view} setView={setView}>{view==="dashboard"?<Dashboard/>:view==="leads"?<LeadsPage/>:view==="propertyDetail"?<PropertyDetail back={()=>setView("properties")}/>:<PropertiesPage open={()=>setView("propertyDetail")}/>}</Shell>;
+  return <>{<Shell view={view} setView={setView}>{view==="dashboard"?<Dashboard addLead={()=>setModal("lead")}/>:view==="leads"?<LeadsPage items={leadItems} addLead={()=>setModal("lead")}/>:view==="propertyDetail"?<PropertyDetail back={()=>setView("properties")}/>:<PropertiesPage items={propertyItems} addProperty={()=>setModal("property")} open={()=>setView("propertyDetail")}/>}</Shell>}{modal&&<CreateModal kind={modal} close={()=>setModal(null)} save={save}/>} {toast&&<div className="toast" role="status">✓ {toast}</div>}</>;
 }
